@@ -11,13 +11,13 @@ require 'logger'
 module Brand2csv
 
 
-  class Marke < Struct.new(:name, :markennummer, :inhaber, :land, :hatVertreter, :hinterlegungsdatum, :zeile_1, :zeile_2, :zeile_3, :zeile_4, :zeile_5, :plz, :ort)
+  class Marke < Struct.new(:id, :status, :name, :nizza, :markennummer, :inhaber, :land, :hatVertreter, :hinterlegungsdatum, :zeile_1, :zeile_2, :zeile_3, :zeile_4, :zeile_5, :plz, :ort)
   end
 
   class Swissreg
-    
+
       # Weitere gesehene Fehler
-    BekannteFehler = 
+    BekannteFehler =
           ['Das Datum ist ung', # ültig'
            '500 Internal Server Error',
            'Vereinfachte Trefferliste anzeigen',
@@ -39,7 +39,7 @@ module Brand2csv
     LineSplit     = ', '
     DefaultCountry = 'Schweiz'
     # Angezeigte Spalten "id_swissreg:mainContent:id_ckbTMChoice"
-    TMChoiceFields = [ 
+    TMChoiceFields = [
             "tm_lbl_tm_text", # Marke
             # "tm_lbl_state"], # Status
             # "tm_lbl_nizza_class"], # Nizza Klassifikation Nr.
@@ -80,16 +80,16 @@ module Brand2csv
     # ["id_swissreg:mainContent:id_ckbTMEmptyHits", "0"],  # Leere Trefferliste anzeigen
     # ["id_swissreg:mainContent:id_ckbTMState", "1"], # "Hängige Gesuche 1
     #      # ["id_swissreg:mainContent:id_ckbTMState", "2"], # "Gelöschte Gesuche 2
-    # ["id_swissreg:mainContent:id_ckbTMState", "3"], # aktive Marken 3 
+    # ["id_swissreg:mainContent:id_ckbTMState", "3"], # aktive Marken 3
     #      # ["id_swissreg:mainContent:id_ckbTMState", "4"], # gelöschte Marken 4
 
-    
+
     MaxZeilen = 5
     HitsPerPage = 250
     LogDir = 'log'
-    
+
     attr_accessor :marke, :results, :timespan
-    
+
     def initialize(timespan, marke = nil, swiss_only=false)
       @timespan = timespan
       @marke = marke
@@ -101,7 +101,7 @@ module Brand2csv
       @lastDetail =nil
       @counterDetails = 0
     end
-    
+
     def writeResponse(filename)
       if defined?(RSpec) or $VERBOSE
         ausgabe = File.open(filename, 'w+')
@@ -125,9 +125,9 @@ module Brand2csv
         end
       }
     end
-    
+
     UseClick = false
-    
+
     # Initialize a session with swissreg and save the cookie as @state
     def init_swissreg
       begin
@@ -148,9 +148,9 @@ module Brand2csv
         exit 3
       end
     end
-    
+
     def parse_swissreg(timespan = @timespan,  # sollte 377 Treffer ergeben, für 01.06.2007-10.06.2007, 559271 wurde in diesem Zeitraum registriert
-                      marke = @marke,    
+                      marke = @marke,
                       nummer =@number) #  nummer = "559271" ergibt genau einen treffer
 
       init_swissreg
@@ -174,7 +174,7 @@ module Brand2csv
       @agent.page.form['id_swissreg:_idcl'] = 'id_swissreg_sub_nav_ipiNavigation_item0_item3'
       @agent.page.forms.first.submit
       writeResponse("#{LogDir}/trademark_extended.html")
-      
+
       data = [
         ["autoScroll", "0,829"],
         ["id_swissreg:_link_hidden_", ""],
@@ -217,7 +217,7 @@ module Brand2csv
       ]
       begin
         @agent.post(Sr3, data)
-      rescue Timeout::Error 
+      rescue Timeout::Error
         puts "Timeout!"
         retry
       end
@@ -226,7 +226,7 @@ module Brand2csv
     end
 
     # the number is only passed to facilitate debugging
-    # lines are the address lines 
+    # lines are the address lines
     def Swissreg::parseAddress(number, inhaber)
       ort = nil
       plz = nil
@@ -263,7 +263,7 @@ module Brand2csv
               lines[cnt] += LineSplit + lines[cnt+1]
               lines.delete_at(cnt+1)
             end
-          end        
+          end
       }
       puts "found #{found}: #{lines.inspect}" if found and $VERBOSE
       return lines[0], lines[1], lines[2], lines[3], lines[4], plz, ort
@@ -271,24 +271,24 @@ module Brand2csv
 
     def Swissreg::getInputValuesFromPage(body) # body of HTML page
       contentData = []
-      body.search('input').each{ |input| 
-                                # puts "name: #{input.attribute('name')} value #{input.attribute('value')}" 
+      body.search('input').each{ |input|
+                                # puts "name: #{input.attribute('name')} value #{input.attribute('value')}"
                                 contentData << [ input.attribute('name').to_s, input.attribute('value').to_s ]
                                 }
       contentData
     end
-    
+
     # return value of an array of POST values
     def Swissreg::inputValue(values, key)
-      values.each{ |val| 
+      values.each{ |val|
                    return val[1] if key.eql?(val[0])
                 }
       return nil
     end
-    
+
     # set value for a key of an array of POST values
     def Swissreg::setInputValue(values, key, newValue)
-      values.each{ |val| 
+      values.each{ |val|
                     if key.eql?(val[0])
                       val[1] = newValue
                       return
@@ -296,50 +296,58 @@ module Brand2csv
                 }
       return
     end
-    
+
     def Swissreg::setAllInputValue(form, values)
       values.each{ |newValue|
 #                 puts "x: 0 #{ newValue[0].to_s} 1 #{newValue[1].to_s}"
-                    form.field(:name => newValue[0].to_s) { |elem| 
+                    form.field(:name => newValue[0].to_s) { |elem|
                                                             next if elem == nil # puts "Cannot set #{newValue[0].to_s}"
-                                                            elem.value = newValue[1].to_s 
+                                                            elem.value = newValue[1].to_s
                                                           }
                  }
     end
 
-    def Swissreg::getMarkenInfoFromDetail(doc)
+    def Swissreg::getMarkenInfoFromDetail(doc, id)
       marke = nil
       number = 'invalid'
       bezeichnung = nil
       inhaber = nil
       hinterlegungsdatum = nil
       hatVertreter = 'Nein'
-      doc.xpath("//html/body/form/div/div/fieldset/div/table/tbody/tr").each{ 
+      nizza = 0
+      status = ''
+      doc.xpath("//html/body/form/div/div/fieldset/div/table/tbody/tr").each{
         |x|
+          if x.children.first.text.eql?('Nizza Klassifikation Nr.')
+            nizza = x.children[1].text
+          end
+          if x.children.first.text.eql?('Status')
+            status = x.children[1].text
+          end
           if x.children.first.text.eql?('Marke')
             if x.children[1].text.index('Markenabbildung')
               # we must fetch the link to the image
               bezeichnung =  x.children[1].elements.first.attribute('href').text
             else # we got a trademark
-              bezeichnung = x.children[1].text 
+              bezeichnung = x.children[1].text
             end
           end
 
           if x.children.first.text.eql?('Inhaber/in')
              inhaber = />(.*)<\/td/.match(x.children[1].to_s)[1].gsub('<br>',LineSplit)
           end
-          
+
           if x.children.first.text.eql?('Vertreter/in')
             hatVertreter = 'Ja' if x.children[1].text.length > 0
           end
-          hinterlegungsdatum = x.children[1].text if x.children.first.text.eql?('Hinterlegungsdatum')           
-          number = x.children[1].text if x.children.first.text.eql?('Gesuch Nr.')           
+          hinterlegungsdatum = x.children[1].text if x.children.first.text.eql?('Hinterlegungsdatum')
+          number = x.children[1].text if x.children.first.text.eql?('Gesuch Nr.')
       }
       zeile_1, zeile_2, zeile_3, zeile_4, zeile_5, plz, ort = Swissreg::parseAddress(number, inhaber)
       inhaber = inhaber.split(', , ')[0] # Catch cases where Inhaber has several postal addresses
-      marke = Marke.new(bezeichnung, number,  inhaber, DefaultCountry, hatVertreter, hinterlegungsdatum, zeile_1, zeile_2, zeile_3, zeile_4, zeile_5, plz, ort )
+      marke = Marke.new(id, status, bezeichnung, nizza, number, inhaber, DefaultCountry, hatVertreter, hinterlegungsdatum, zeile_1, zeile_2, zeile_3, zeile_4, zeile_5, plz, ort )
     end
-    
+
     def fetchDetails(nummer) # takes a long time!
       @counterDetails += 1
       init_swissreg if @counterDetails % 90 == 0 # it seems that swissreg is artificially slowing down serving request after 100 hits
@@ -371,7 +379,7 @@ module Brand2csv
         doc = Nokogiri::Slop(body)
         writeResponse(filename)
       end
-      marke =  Swissreg::getMarkenInfoFromDetail(doc)
+      marke =  Swissreg::getMarkenInfoFromDetail(doc, nummer)
       @results << marke
     end
 
@@ -384,23 +392,23 @@ module Brand2csv
         results[0].members.each { |member| s += member + ';' }
         ausgabe.puts s.chop
         # write all line
-        results.each{ 
-          |result| 
+        results.each{
+          |result|
             s = ''
-            result.members.each{ |member| 
-                                  unless eval("result.#{member}") 
+            result.members.each{ |member|
+                                  unless eval("result.#{member}")
                                     s += ';'
                                   else
                                     value = eval("result.#{member.to_s}")
                                     value = "\"#{value}\"" if value.index(';')
-                                    s += value + ';' 
+                                    s += value + ';'
                                   end
                                }
             ausgabe.puts s.chop
-        }        
+        }
         ausgabe.close
       else
-        
+
         CSV.open(filename,  'w', :headers=>results[0].members,
                                   :write_headers => true,
                                   :col_sep => ';'
@@ -408,23 +416,23 @@ module Brand2csv
         end
       end
     end
-    
+
     def Swissreg::getTrademarkNumbers(doc)
       trademark_numbers = []
-      doc.search('a').each{ 
-        |link| 
+      doc.search('a').each{
+        |link|
           if DetailRegexp.match(link.attribute('id'))
             trademark_numbers << link.children.first.children.first.content
           end
       }
       trademark_numbers
     end
-    
+
     class Swissreg::Vereinfachte
       attr_reader :links2details, :trademark_search_id, :inputData, :firstHit, :nrHits, :nrSubPages, :pageNr
       HitRegexpDE = /Seite (\d*) von ([\d']*) - Treffer ([\d']*)-([\d']*) von ([\d']*)/
       Vivian      = 'id_swissreg:mainContent:vivian'
-      
+
       # Parse a HTML page from swissreg sr3.jsp
       # There we find info like "Seite 1 von 26 - Treffer 1-250 von 6'349" and upto 250 links to details
       def initialize(doc)
@@ -443,23 +451,23 @@ module Brand2csv
         end
         @trademark_search_id = Swissreg::inputValue(Swissreg::getInputValuesFromPage(doc), Vivian)
         @links2details = []
-        doc.search('input').each{ |input| 
+        doc.search('input').each{ |input|
                                 # puts "name: #{input.attribute('name')} value #{input.attribute('value')}" if $VERBOSE
                                 @inputData << [ input.attribute('name').to_s, input.attribute('value').to_s ]
                                 }
-        
+
         @state = Swissreg::inputValue(Swissreg::getInputValuesFromPage(doc),  'javax.faces.ViewState')
-        doc.search('a').each{ 
-          |link| 
+        doc.search('a').each{
+          |link|
             if m = DetailRegexp.match(link.attribute('id'))
               # puts "XXX #{link.attribute('onclick').to_s} href: #{link.attribute('href').to_s} value #{link.attribute('value').to_s}" if $VERBOSE
               m  = /'tmMainId','(\d*)'/.match(link.attribute('onclick').to_s)
               tmMainId = m[1].to_i
               @links2details << tmMainId
-            end      
-        }      
+            end
+        }
       end
-      
+
       def getPostDataForDetail(position, id)
         [
           [ "autoScroll", "0,0"],
@@ -487,12 +495,12 @@ module Brand2csv
           [ "javax.faces.ViewState", @state]
         ]
       end
-      
+
     end
-      
+
     def getAllHits(filename = nil, pageNr = 1)
       if filename && File.exists?(filename)
-        doc = Nokogiri::Slop(File.open(filename))        
+        doc = Nokogiri::Slop(File.open(filename))
       else
         form = @agent.page.form
         btn  = form.buttons.last
@@ -524,20 +532,20 @@ module Brand2csv
         Swissreg::setAllInputValue(@agent.page.forms.first, data2)
         @agent.page.forms.first.submit
         getAllHits(nil, subPage2Fetch)
-      end      
+      end
       @all_trademark_numbers
     end
 
     def fetchresult(filename =  "#{LogDir}/fetch_1.html", counter = 1)
       if filename && File.exists?(filename)
-        doc = Nokogiri::Slop(File.open(filename))        
+        doc = Nokogiri::Slop(File.open(filename))
       else
         body = @agent.page.body
         body.force_encoding('utf-8') unless /^1\.8/.match(RUBY_VERSION)
         doc = Nokogiri::Slop(body)
         writeResponse(filename)
       end
-      
+
       if /Vereinfachte Trefferliste anzeigen/i.match(doc.text)
         form = @agent.page.forms.first
         button = form.button_with(:value => /Vereinfachte/i)
@@ -547,11 +555,13 @@ module Brand2csv
         writeResponse(filename)
       end
       getAllHits(doc, counter)
-      puts"getAllHits: returned #{@all_trademark_numbers ? @all_trademark_numbers.size : 0} hits "
+      puts "getAllHits: returned #{@all_trademark_numbers ? @all_trademark_numbers.size : 0} hits "
+      puts "start gathering details"
       if @all_trademark_numbers
-        @all_trademark_numbers.each{ 
-          |nr|
+        @all_trademark_numbers.each_with_index{
+          |nr, i|
             nrRetries = 0
+            puts "#{i + 1} of #{@all_trademark_numbers.size}"
             begin
               fetchDetails(nr)
             rescue SocketError, Exception => e
@@ -567,14 +577,14 @@ module Brand2csv
                 raise Interrupt
               end
             end
-        
+
         }
       else
         puts "Could not find any trademarks in #{filename}"
       end
     end
   end # class Swissreg
-  
+
   def Brand2csv::run(timespan, marke = 'a*', swiss_only = false)
     session = Swissreg.new(timespan, marke, swiss_only)
     begin
@@ -586,5 +596,5 @@ module Brand2csv
     Swissreg::emitCsv(session.results, "#{timespan}.csv")
     session.results
   end
-  
+
 end # module Brand2csv
